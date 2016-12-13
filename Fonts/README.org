@@ -1,0 +1,5 @@
+#+TITLE: README
+
+- Place these fonts in ~/usr/share/fonts/TTF~
+- Sources: 
+  - https://github.com/powerline/fonts

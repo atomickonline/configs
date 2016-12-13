@@ -1,0 +1,91 @@
+#+TITLE: ArcSight - Connectors
+
+* SmartConnectors
+** Uninstalling
+   Run: $SMARTCONNECTORINSTALL/current/UninstallerData/Uninstall_ArcSightAgents.exe
+** BIN Files
+*** arcsight.bat
+**** Options
+     | agentsetup |
+     |            |
+     
+
+* Connector Types
+** Microsoft Windows Event Log - Unified
+   - *NOTE*: Notes taken based off SmartConnector version 7.3.0 x64
+   - *NOTE*: AD Query User has to be Domain Admin? It appears that it
+             does to be able to query Domain Controllers. Tested with using a
+             normal user vs domain admin. The Domain Admin could query the
+             Domain Controller but the normal user couldn't. There is probably
+             a group policy to modify this.
+   - *NOTE*: During testing, I've discovered that the polling period
+     is approximately 2 minutes. So every 2 minutes, I got an input of
+     new logs from the WUC. (Give or take 15 seconds)
+*** Description
+    The Windows Unified Connector queries an Domain Controller or Global Catalog (don't know) to firstly find Authenticated Windows Computers and then can retrieve logs (category can be defined) from these computers (selection available)
+*** Parameters
+    #+CAPTION: Default Parameters
+    [[./.connectors-01.png]]
+    
+| Parameter                      | Field Description                                                                                                                                                            | Example                                                                        |
+|--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------|
+| Forwarded Events Collection    | Enable forwarded events collection from Windows Event Collectors (WEC)                                                                                                       |                                                                                |
+| Domain Name                    | Domain Name                                                                                                                                                                  |                                                                                |
+| Domain User Name               | Domain User Name                                                                                                                                                             |                                                                                |
+| Domain User Password           | Domain User Password                                                                                                                                                         |                                                                                |
+| Active Directory Server        | AD Server IP or Hostname                                                                                                                                                     |                                                                                |
+| Active Directory Base DN       | Active Directory Base DN is the starting point in the MS Active Directory Hierarchy at which your search will begin.                                                         | ou=West Coast,dc=MySubDomain,dc=MyDomain,dc=com OR dc=dataengines,dc=com,dc=au |
+| Active Directory Filter        | Active Directory Filter required to filter hosts by name, operating system, and creation time                                                                                |                                                                                |
+| Active Directory User Name     | Active Directory User Name Required for Query                                                                                                                                |                                                                                |
+| Active Directory User Password | Active Directory User Password required for Query                                                                                                                            |                                                                                |
+| Active Directory Protocol      | Active Directory Service Security Protocol (SSL or Non-SSL)                                                                                                                  |                                                                                |
+| Active Directory Port          | Active Directory Port. Usually 389 for Non-SSL and 636 for SSL                                                                                                               |                                                                                |
+| Active Directory Max Page Size | Active Directory Max Page Size for Query, default is 300                                                                                                                     |                                                                                |
+| Global Catalog Server          | Global Catalog server IP or Hostname required for GUID Translation. If you want to use the Active Directory Server as the Global Catalog Server, then leave this field blank |                                                                                |
+| Global Catalog Base DN         | "" ""                                                                                                                                                                        |                                                                                |
+| Global Catalog User Name       | "" ""                                                                                                                                                                        |                                                                                |
+| Global Catalog User Password   | "" ""                                                                                                                                                                        |                                                                                |
+
+
+*** Type
+[[./.connectors-02.png]]
+
+*** Modify
+[[./.connectors-03.png]]
+
+
+    
+*** Troubleshooting
+    [[https://social.technet.microsoft.com/Forums/windowsserver/en-US/d37dbb98-4bd8-4d4d-bbc2-3bda5c13cd07/read-domain-controller-event-logs-from-nonadmin?forum%3DwinserverDS][TechNet]]
+    - No Logs Coming Through
+      - Tried wevtutil sl security command
+      - Tried wecutil qc
+
+    - *Solution*: I had forgotten to promote the ad account to domain
+      admin, so I was just using a normal user account (Domain user)
+      for the queries. After adding the user that I specified during
+      the connector setup (Active Directory User) to the Domain Admin
+      group, I started to see event logs coming through.
+      
+    - *NOTE*: Confirmed with testing, I created a domain user, and
+      tried but it could not connect to retrieve logs. After adding
+      that user to the *Domain Admins* group, it worked fine.
+      
+    - *SOLUTION!!!*: I managed to find a working solution thanks to a pdf from HP Protect: *HPE_Security_ArcSight_Collecting_Windows_Event_Logs.pdf*
+      - Create a new GPO which will be applied to the target computers that you want to be able to have their logs read
+      - There is only 1 Group Policy setting to configure:
+        - ComputerConfiguration/Policies/WindowsSettings/SecuritySettings/RestrictedGroups
+        - Add a group: *BUILTIN\Event Log Readers*
+        - Add Members: *DOMAIN\Arcsight*, *NT AUTHORITY\NETWORK SERVICE*
+      - Update01: Upon further testing, it appears to work without the NETWORK SERVICE user. I will try without both to confirm
+      - Update02: After removing both user from the Event Log Readers group, I was not able to continue with the SmartConnector setup. But after I added just the arcsight user back, it worked. I don't think I need the NETWORK SERVICE user in the group
+        
+
+    - *TEST01*: Reverted Wevtutil security to disallow network service. (Removed (A;;0X1;;;S-1-5-0) )
+      - *RESULT*: After removing the security modificaiton, I was still able to receive logs. So I am fairly sure the only 'necessity' is for the user configured in the SmartConnector to be a member of the EventLog Readers BUILTIN group for each machine
+** Microsoft Windows Event Log - Native (AKA Local Logs)
+   1) Minimum Parameters
+      - [[file:./.connectors-04.png]]
+   2) Leave the WEF Source Hosts file blank
+      - [[file:./.connectors-05.png]]
+   3) The rest is normal Smartconnector setup
